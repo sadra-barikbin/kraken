@@ -523,23 +523,19 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     angle = np.arctan2(dir_vec[1], dir_vec[0])
 
     if topline:
-        upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle, im_feats)).simplify(5)
-        bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle, im_feats)).simplify(5)
+        upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle, im_feats))
+        bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle, im_feats))
     else:
-        upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle, im_feats)).simplify(5)
-        bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle, im_feats)).simplify(5)
+        upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle, im_feats))
+        bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle, im_feats))
+    # XXX: hacky trick to make sure dotting is included in bounding polygon by
+    #      expanding it to its maximum distance from baseline.
+    baseline = geom.LineString(baseline)
+    us_dist = upper_seam.hausdorff_distance(baseline)
+    bs_dist = bottom_seam.hausdorff_distance(baseline)
 
-    # ugly workaround against GEOM parallel_offset bug creating a
-    # MultiLineString out of offset LineString
-    if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
-        upper_seam = np.array(upper_seam, dtype=int)
-    else:
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=int)[::-1]
-    if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
-        bottom_seam = np.array(bottom_seam, dtype=int)
-    else:
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=int)
-
+    upper_seam = np.array(baseline.parallel_offset(us_dist, side='right'), dtype=int)[::-1]
+    bottom_seam = np.array(baseline.parallel_offset(bs_dist, side='left'), dtype=int)
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
     return polygon
 
